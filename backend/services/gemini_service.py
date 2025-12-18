@@ -3,108 +3,96 @@ import requests
 import json
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment variables from the backend directory
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(backend_dir, '.env'))
 
-class OpenAIService:
+class GeminiService:
     def __init__(self):
-        self.gemini_api_key = os.getenv('GEMINI_API_KEY')
-        self.gemini_endpoint = os.getenv('GEMINI_ENDPOINT', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent')
-        
-        # Use only Gemini API
-        self.use_gemini = bool(self.gemini_api_key and self.gemini_endpoint)
-        self.use_openai = False
-        
-        print(f" AI Service Configuration:")
-        print(f"   Gemini API: {'Configured' if self.use_gemini else 'Not configured'}")
-        if self.use_gemini:
-            print(f"   Gemini Key: {self.gemini_api_key[:20]}...")
-            print(f"   Gemini Endpoint: {self.gemini_endpoint}")
-    
-    def _call_ai_model(self, messages, model="gemini-2.0-flash", use_gemini=None):
-        """Call Gemini AI model with fallback"""
-        try:
-            print(f"🔄 _call_ai_model called with {len(messages)} messages")
-            print(f"🔄 use_gemini: {self.use_gemini}, api_key exists: {bool(self.gemini_api_key)}")
-            
-            if self.use_gemini and self.gemini_api_key:
-                print("🔄 Calling Gemini API...")
-                result = self._call_gemini(messages)
-                print(f"✅ Gemini API returned: {result[:100]}..." if result else "❌ Empty response")
-                return result
-            else:
-                print("⚠️  Gemini API not configured, using mock response")
-                return self._get_mock_response()
-        except Exception as e:
-            print(f"❌ Error calling Gemini API: {e}")
-            import traceback
-            print(f"❌ Traceback: {traceback.format_exc()}")
-            return self._get_mock_response()
-    
-    def _call_gemini(self, messages):
+        self.api_key = os.getenv('GEMINI_API_KEY','AIzaSyCfBXN7Iqy6bzh_k8vG2nn8o2jTM69XTUY')
+        self.endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+
+        if not self.api_key:
+            print("⚠️  WARNING: GEMINI_API_KEY not found in environment variables")
+            self.configured = False
+        else:
+            print("✅ Gemini API configured successfully")
+            print(f"   API Key: {self.api_key[:20]}...")
+            print(f"   Endpoint: {self.endpoint}")
+            self.configured = True
+
+    def _call_gemini(self, messages, temperature=0.7, max_tokens=1500):
         """Call Google Gemini API"""
-        # Convert OpenAI format messages to Gemini format
-        gemini_content = ""
-        for msg in messages:
-            if msg['role'] == 'system':
-                gemini_content += f"System: {msg['content']}\n\n"
-            elif msg['role'] == 'user':
-                gemini_content += f"User: {msg['content']}\n\n"
-        
-        # Remove the last newlines
-        gemini_content = gemini_content.strip()
-        
-        # Google Gemini API format
-        url = f"{self.gemini_endpoint}?key={self.gemini_api_key}"
-        
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        
-        data = {
-            "contents": [
-                {
-                    "parts": [
-                        {
-                            "text": gemini_content
-                        }
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.7,
-                "maxOutputTokens": 1500
+        if not self.configured:
+            return self._get_mock_response()
+
+        try:
+            # Convert messages to Gemini format
+            gemini_content = ""
+            for msg in messages:
+                if msg['role'] == 'system':
+                    gemini_content += f"System: {msg['content']}\n\n"
+                elif msg['role'] == 'user':
+                    gemini_content += f"User: {msg['content']}\n\n"
+
+            gemini_content = gemini_content.strip()
+
+            url = f"{self.endpoint}?key={self.api_key}"
+
+            headers = {
+                'Content-Type': 'application/json'
             }
-        }
-        
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
-        
-        result = response.json()
-        
-        # Extract response from Gemini format
-        if 'candidates' in result and len(result['candidates']) > 0:
-            if 'content' in result['candidates'][0] and 'parts' in result['candidates'][0]['content']:
-                return result['candidates'][0]['content']['parts'][0]['text']
-        
-        # Fallback if response format is unexpected
-        return "Sorry, I couldn't process that request."
+
+            data = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": gemini_content
+                            }
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": temperature,
+                    "maxOutputTokens": max_tokens
+                }
+            }
+
+            response = requests.post(url, headers=headers, json=data, timeout=30)
+            response.raise_for_status()
+
+            result = response.json()
+
+            # Extract response text
+            if 'candidates' in result and len(result['candidates']) > 0:
+                candidate = result['candidates'][0]
+                if 'content' in candidate and 'parts' in candidate['content']:
+                    return candidate['content']['parts'][0]['text']
+
+            return "Sorry, I couldn't process that request."
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Gemini API request error: {e}")
+            return self._get_mock_response()
+        except Exception as e:
+            print(f"❌ Gemini API error: {e}")
+            return self._get_mock_response()
+
     
-    def _get_mock_response(self):
-        """Return mock response when no AI service is available"""
-        return "Mock AI response - Please configure OpenAI or Gemini API keys for actual analysis."
-    
+
     def analyze_resume(self, resume_text, job_description=""):
         """Analyze resume and provide comprehensive evaluation"""
         try:
             prompt = f"""
             Analyze the following resume and provide a comprehensive evaluation in JSON format.
-            
+
             Resume Text:
             {resume_text}
-            
+
             Job Description (if provided):
             {job_description}
-            
+
             Please provide analysis in the following JSON structure:
             {{
                 "overall_score": <number 0-100>,
@@ -125,39 +113,39 @@ class OpenAIService:
                     "phone": "<phone>"
                 }}
             }}
-            
+
             Ensure the response is valid JSON only, no additional text.
             """
-            
+
             messages = [
                 {"role": "system", "content": "You are an expert HR professional and resume analyst. Provide detailed, objective analysis in valid JSON format only."},
                 {"role": "user", "content": prompt}
             ]
-            
-            response = self._call_ai_model(messages)
-            
+
+            response = self._call_gemini(messages)
+
             # Try to parse JSON response
             try:
                 analysis = json.loads(response)
                 return analysis
             except json.JSONDecodeError:
-                # If JSON parsing fails, return a structured mock response
+                print(f"❌ JSON parsing failed, using mock analysis. Response: {response[:200]}...")
                 return self._get_mock_analysis(resume_text)
-                
+
         except Exception as e:
-            print(f"Error in resume analysis: {str(e)}")
+            print(f"❌ Error in resume analysis: {str(e)}")
             return self._get_mock_analysis(resume_text)
-    
+
     def _get_mock_analysis(self, resume_text=""):
         """Return mock analysis structure with unique data based on resume content"""
         import random
         import re
         import hashlib
-        
+
         # Create a seed based on resume content for consistent but unique results
         content_hash = hashlib.md5(resume_text.encode()).hexdigest()
         random.seed(content_hash)
-        
+
         # Extract actual information from resume text
         name = self._extract_name(resume_text)
         email = self._extract_email(resume_text)
@@ -165,11 +153,11 @@ class OpenAIService:
         skills = self._extract_skills(resume_text)
         experience_years = self._estimate_experience(resume_text)
         education = self._extract_education(resume_text)
-        
+
         # Generate varied scores based on content
         base_score = random.randint(60, 95)
         skills_match = random.randint(65, 90)
-        
+
         # Determine category based on score
         if base_score >= 85:
             category = "Highly Qualified"
@@ -177,7 +165,7 @@ class OpenAIService:
             category = "Qualified"
         else:
             category = "Not a Fit"
-        
+
         # Determine experience level
         if experience_years >= 7:
             exp_level = "Senior"
@@ -187,7 +175,7 @@ class OpenAIService:
             exp_level = "Junior"
         else:
             exp_level = "Entry-level"
-        
+
         # Generate varied strengths and weaknesses
         all_strengths = [
             "Strong technical skills", "Excellent communication", "Leadership potential",
@@ -195,17 +183,17 @@ class OpenAIService:
             "Analytical thinking", "Attention to detail", "Adaptability",
             "Innovation mindset", "Client-facing experience", "Mentoring skills"
         ]
-        
+
         all_weaknesses = [
             "Limited leadership experience", "Could improve project management",
             "Needs more industry-specific knowledge", "Limited cross-functional experience",
             "Could benefit from additional certifications", "Needs more client-facing experience",
             "Could improve presentation skills", "Limited international experience"
         ]
-        
+
         strengths = random.sample(all_strengths, random.randint(3, 5))
         weaknesses = random.sample(all_weaknesses, random.randint(2, 3))
-        
+
         # Generate recommendations
         recommendations = [
             "Consider for technical interview",
@@ -215,11 +203,11 @@ class OpenAIService:
             "Discuss career goals and growth plans"
         ]
         selected_recommendations = random.sample(recommendations, random.randint(2, 4))
-        
+
         return {
             "overall_score": base_score,
             "category": category,
-            "summary": f"{exp_level} candidate with {experience_years} years of experience. Shows strong potential in {', '.join(skills[:3])}.",
+            "summary": f"{exp_level} candidate with {experience_years} years of experience. Shows strong potential in {', '.join(skills[:3])}. ",
             "strengths": strengths,
             "weaknesses": weaknesses,
             "skills_match": skills_match,
@@ -235,75 +223,75 @@ class OpenAIService:
                 "phone": phone
             }
         }
-    
+
     def _extract_name(self, text):
         """Extract name from resume text using enhanced parser"""
         from services.resume_parser import ResumeParser
-        
+
         parser = ResumeParser()
         contact_info = parser.extract_contact_info(text)
-        
+
         return contact_info.get('name', 'Candidate Name')
-    
+
     def _extract_email(self, text):
         """Extract email from resume text using enhanced parser"""
         from services.resume_parser import ResumeParser
-        
+
         parser = ResumeParser()
         contact_info = parser.extract_contact_info(text)
-        
+
         return contact_info.get('email', 'candidate@email.com')
-    
+
     def _extract_phone(self, text):
         """Extract phone number from resume text using enhanced parser"""
         from services.resume_parser import ResumeParser
-        
+
         parser = ResumeParser()
         contact_info = parser.extract_contact_info(text)
-        
+
         return contact_info.get('phone', '+1-234-567-8900')
-    
+
     def _extract_skills(self, text):
         """Extract skills from resume text using enhanced parser"""
         from services.resume_parser import ResumeParser
-        
+
         parser = ResumeParser()
         skills = parser.extract_skills(text)
-        
+
         # If no skills found, generate some based on content
         if not skills:
             import random
             random.seed(hash(text) % 1000)
             default_skills = ["Python", "JavaScript", "SQL", "Git", "Communication"]
             skills = random.sample(default_skills, random.randint(3, 5))
-        
+
         return skills[:10]  # Limit to 10 skills
-    
+
     def _estimate_experience(self, text):
         """Estimate years of experience from resume text using enhanced parser"""
         from services.resume_parser import ResumeParser
-        
+
         parser = ResumeParser()
         experience = parser.extract_experience_years(text)
-        
+
         # If no experience found, make a reasonable estimate
         if experience == 0:
             import random
             random.seed(hash(text) % 1000)
             experience = random.randint(1, 5)
-        
+
         return experience
-    
+
     def _extract_education(self, text):
         """Extract education information from resume text using enhanced parser"""
         from services.resume_parser import ResumeParser
-        
+
         parser = ResumeParser()
         education_list = parser.extract_education(text)
-        
+
         if education_list and education_list[0] != "Education information not clearly specified":
             return "; ".join(education_list[:2])  # Join first 2 education entries
-        
+
         # Default education based on content analysis
         text_lower = text.lower()
         if "computer" in text_lower or "software" in text_lower or "programming" in text_lower:
@@ -314,7 +302,7 @@ class OpenAIService:
             return "Bachelor's degree in Engineering"
         else:
             return "Bachelor's degree"
-    
+
     def chat_about_candidate(self, candidate, message):
         """Chat about a specific candidate with enhanced formatting"""
         try:
@@ -374,10 +362,10 @@ RESPONSE FORMATTING RULES:
                 {"role": "user", "content": prompt}
             ]
 
-            return self._call_ai_model(messages)
+            return self._call_gemini(messages)
 
         except Exception as e:
-            print(f"API call failed for candidate chat, using mock response: {e}")
+            print(f"❌ API call failed for candidate chat, using mock response: {e}")
             return self._generate_mock_candidate_response(candidate, message)
 
     def _generate_mock_candidate_response(self, candidate, message):
@@ -401,8 +389,8 @@ RESPONSE FORMATTING RULES:
     def hr_assistant_chat(self, candidates, message):
         """General HR assistant chat about all candidates"""
         try:
-            print(f"HR Assistant Chat - Message: {message}")
-            print(f"HR Assistant Chat - Candidates count: {len(candidates) if candidates else 0}")
+            print(f"🔄 HR Assistant Chat - Message: {message}")
+            print(f"🔄 HR Assistant Chat - Candidates count: {len(candidates) if candidates else 0}")
 
             # Summarize candidates for context
             candidate_summary = []
@@ -418,13 +406,13 @@ RESPONSE FORMATTING RULES:
                         }
                         candidate_summary.append(summary)
                     except Exception as e:
-                        print(f"Error processing candidate: {e}")
+                        print(f"❌ Error processing candidate: {e}")
                         continue
 
             try:
                 candidates_info = json.dumps(candidate_summary, indent=2)
             except Exception as e:
-                print(f"Error serializing candidates: {e}")
+                print(f"❌ Error serializing candidates: {e}")
                 candidates_info = "No candidate data available"
 
             prompt = f"""
@@ -459,7 +447,7 @@ RESPONSE FORMATTING RULES:
                 {"role": "user", "content": prompt}
             ]
 
-            return self._call_ai_model(messages)
+            return self._call_gemini(messages)
 
         except Exception as e:
             print(f"❌ HR Assistant Chat Error: {str(e)}")

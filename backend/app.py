@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import uuid
 
 from services.resume_parser import ResumeParser
-from services.openai_service import OpenAIService
+from services.gemini_service import GeminiService
 from services.bias_detection import BiasDetector
 from services.database import DatabaseManager
 from services.email_service import EmailService
@@ -29,7 +29,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Initialize services
 resume_parser = ResumeParser()
-ai_service = OpenAIService()
+ai_service = GeminiService()
 bias_detector = BiasDetector()
 db_manager = DatabaseManager()
 email_service = EmailService()

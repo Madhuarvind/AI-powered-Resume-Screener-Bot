@@ -1,0 +1,24 @@
+- type: web
+    name: resume-screener-backend
+    runtime: python3
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && python start.py"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false  # Set this in Render dashboard
+    plan: free
+=======
+services:
+  - type: web
+    name: resume-screener-backend
+    runtime: python3
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 1 --worker-class sync --timeout 30 start:app"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false  # Set this in Render dashboard
+    plan: free

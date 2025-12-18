@@ -7,7 +7,7 @@
 - **Audio**: Clear voiceover with background music
 - **Style**: Professional demonstration with screen recording
 
-## Opening Scene (0:00 - 0:30)
+## Opening Scene (0:00 - 0:30)`
 **[Show project logo/title screen with background music]**
 
 **Narrator Script:**
