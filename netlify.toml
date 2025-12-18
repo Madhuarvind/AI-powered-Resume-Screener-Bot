@@ -1,0 +1,25 @@
+[build]
+  publish = "frontend/build"
+  command = "cd frontend && npm run build"
+
+[build.environment]
+  REACT_APP_API_BASE_URL = "https://your-render-backend-url.onrender.com/api"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.processing]
+  skip_processing = false
+
+[build.processing.css]
+  bundle = true
+  minify = true
+
+[build.processing.js]
+  bundle = true
+  minify = true
+
+[build.processing.html]
+  pretty_urls = true
