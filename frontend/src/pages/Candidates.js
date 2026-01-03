@@ -1,31 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { 
-  Search, 
-  Filter, 
-  SortAsc, 
-  Eye, 
-  MessageSquare, 
+import {
+  Search,
+  Filter,
+  SortAsc,
+  Eye,
+  MessageSquare,
   Shield,
   Star,
   Clock,
   User,
   FileText,
-  ChevronDown
+  ChevronDown,
+  CheckSquare,
+  Square,
+  X,
+  TrendingUp
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { apiService } from '../services/api';
 import toast from 'react-hot-toast';
 import config from '../config';
 
 const Candidates = () => {
+  // Candidate Management Component
   const [candidates, setCandidates] = useState([]);
   const [filteredCandidates, setFilteredCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('upload_date');
+
   const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedCandidates, setSelectedCandidates] = useState(new Set());
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonResult, setComparisonResult] = useState(null);
+  const [isComparing, setIsComparing] = useState(false);
 
   useEffect(() => {
     fetchCandidates();
@@ -62,7 +73,7 @@ const Candidates = () => {
 
     // Filter by category
     if (selectedCategory !== 'All') {
-      filtered = filtered.filter(candidate => 
+      filtered = filtered.filter(candidate =>
         candidate.analysis?.category === selectedCategory
       );
     }
@@ -70,7 +81,7 @@ const Candidates = () => {
     // Sort candidates
     filtered.sort((a, b) => {
       let aValue, bValue;
-      
+
       switch (sortBy) {
         case 'score':
           aValue = a.analysis?.overall_score || 0;
@@ -97,6 +108,46 @@ const Candidates = () => {
     });
 
     setFilteredCandidates(filtered);
+    setFilteredCandidates(filtered);
+  };
+
+  const toggleCandidateSelection = (id) => {
+    const newSelected = new Set(selectedCandidates);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedCandidates(newSelected);
+  };
+
+  const cleanComparison = () => {
+    setComparisonResult(null);
+    setShowComparison(false);
+  };
+
+  const handleCompare = async () => {
+    if (selectedCandidates.size < 2) {
+      toast.error('Please select at least 2 candidates to compare');
+      return;
+    }
+
+    setIsComparing(true);
+    setShowComparison(true);
+
+    try {
+      const response = await apiService.compareCandidates(
+        Array.from(selectedCandidates),
+        "Job Description not specified"
+      );
+      setComparisonResult(response.data.comparison);
+    } catch (error) {
+      console.error('Comparison failed:', error);
+      toast.error('Failed to compare candidates');
+      setShowComparison(false);
+    } finally {
+      setIsComparing(false);
+    }
   };
 
   const getCategoryColor = (category) => {
@@ -160,7 +211,7 @@ const Candidates = () => {
             {filteredCandidates.length} of {candidates.length} candidates
           </p>
         </div>
-        
+
         <Link to="/upload" className="btn-primary">
           <FileText className="h-4 w-4 mr-2" />
           Upload Resume
@@ -222,13 +273,84 @@ const Candidates = () => {
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
             className="btn-secondary flex items-center justify-center"
           >
-            <SortAsc className={`h-4 w-4 mr-2 transition-transform ${
-              sortOrder === 'desc' ? 'rotate-180' : ''
-            }`} />
+            <SortAsc className={`h-4 w-4 mr-2 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''
+              }`} />
             {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
           </button>
         </div>
       </motion.div>
+
+      {/* Comparison Action Bar */}
+      <AnimatePresence>
+        {selectedCandidates.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-xl border border-gray-200 p-2 z-40 flex items-center space-x-4 px-6"
+          >
+            <span className="font-medium text-gray-700">
+              {selectedCandidates.size} selected
+            </span>
+            <div className="h-6 w-px bg-gray-200"></div>
+            <button
+              onClick={() => setSelectedCandidates(new Set())}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleCompare}
+              className="btn-primary py-2 px-6 rounded-full flex items-center space-x-2"
+            >
+              <TrendingUp className="h-4 w-4" />
+              <span>Compare Candidates</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Comparison Modal */}
+      <AnimatePresence>
+        {showComparison && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col"
+            >
+              <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <TrendingUp className="h-5 w-5 text-primary-500 mr-2" />
+                  Candidate Comparison
+                </h2>
+                <button
+                  onClick={cleanComparison}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 prose prose-blue max-w-none">
+                {isComparing ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full"
+                    />
+                    <p className="text-gray-600 font-medium">Analyzing and comparing candidates...</p>
+                  </div>
+                ) : (
+                  <ReactMarkdown>{comparisonResult || "No comparison data available."}</ReactMarkdown>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Candidates List */}
       <div className="space-y-4">
@@ -243,6 +365,23 @@ const Candidates = () => {
               className="card p-6 hover:shadow-lg transition-all duration-300"
             >
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* Selection Checkbox */}
+                <div className="flex items-start">
+                  <button
+                    onClick={() => toggleCandidateSelection(candidate.id)}
+                    className={`mt-1 mr-4 p-1 rounded transition-colors ${selectedCandidates.has(candidate.id)
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-gray-300 hover:text-gray-400'
+                      }`}
+                  >
+                    {selectedCandidates.has(candidate.id) ? (
+                      <CheckSquare className="h-5 w-5" />
+                    ) : (
+                      <Square className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+
                 {/* Candidate Info */}
                 <div className="flex-1 space-y-3">
                   <div className="flex items-start justify-between">
@@ -254,12 +393,12 @@ const Candidates = () => {
                         {candidate.analysis?.experience_level} • {candidate.analysis?.experience_years || 0} years experience
                       </p>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <span className={`badge ${getCategoryColor(candidate.analysis?.category)}`}>
                         {candidate.analysis?.category || 'Pending'}
                       </span>
-                      
+
                       {candidate.bias_analysis && (
                         <span className={`text-xs font-medium ${getBiasRiskColor(candidate.bias_analysis.overall_bias_score)}`}>
                           {getBiasRiskLabel(candidate.bias_analysis.overall_bias_score)}
@@ -276,7 +415,7 @@ const Candidates = () => {
                         Score: {candidate.analysis?.overall_score || 0}%
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <Clock className="h-4 w-4 text-gray-400" />
                       <span className="text-sm text-gray-600">
@@ -314,7 +453,7 @@ const Candidates = () => {
                     <Eye className="h-4 w-4" />
                     <span>View Details</span>
                   </Link>
-                  
+
                   <Link
                     to={`/candidates/${candidate.id}?tab=chat`}
                     className="btn-primary flex items-center space-x-2"
@@ -322,7 +461,7 @@ const Candidates = () => {
                     <MessageSquare className="h-4 w-4" />
                     <span>AI Chat</span>
                   </Link>
-                  
+
                   {candidate.bias_analysis && (
                     <Link
                       to={`/candidates/${candidate.id}?tab=bias`}
@@ -350,7 +489,7 @@ const Candidates = () => {
               {candidates.length === 0 ? 'No candidates yet' : 'No candidates match your filters'}
             </h3>
             <p className="text-gray-600 mb-6">
-              {candidates.length === 0 
+              {candidates.length === 0
                 ? 'Upload your first resume to get started with AI-powered candidate screening.'
                 : 'Try adjusting your search criteria or filters to find candidates.'
               }

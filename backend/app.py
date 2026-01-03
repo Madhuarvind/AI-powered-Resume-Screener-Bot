@@ -259,6 +259,39 @@ def send_notification():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/interview-questions/<int:candidate_id>', methods=['GET'])
+def get_interview_questions(candidate_id):
+    try:
+        candidate = db_manager.get_candidate(candidate_id)
+        if not candidate:
+            return jsonify({'error': 'Candidate not found'}), 404
+        
+        questions = ai_service.generate_interview_questions(candidate, candidate.get('job_description', ''))
+        return jsonify(questions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/compare-candidates', methods=['POST'])
+def compare_candidates_endpoint():
+    try:
+        data = request.get_json()
+        candidate_ids = data.get('candidate_ids', [])
+        job_description = data.get('job_description', '')
+        
+        candidates = []
+        for cid in candidate_ids:
+            c = db_manager.get_candidate(cid)
+            if c:
+                candidates.append(c)
+        
+        if not candidates:
+            return jsonify({'error': 'No valid candidates found'}), 400
+            
+        comparison = ai_service.compare_candidates(candidates, job_description)
+        return jsonify({'comparison': comparison})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # Initialize database
     db_manager.init_db()

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowLeft, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Star, 
-  TrendingUp, 
+import {
+  ArrowLeft,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Star,
+  TrendingUp,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -17,7 +17,9 @@ import {
   Eye,
   EyeOff,
   Send,
-  Bot
+  Bot,
+  HelpCircle,
+  FileText
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import toast from 'react-hot-toast';
@@ -35,6 +37,8 @@ const CandidateDetail = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [showBlindResume, setShowBlindResume] = useState(false);
+  const [interviewQuestions, setInterviewQuestions] = useState(null);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   // Format AI responses for better display
   const formatAIResponse = (text) => {
@@ -63,7 +67,7 @@ const CandidateDetail = () => {
       ]);
 
       setCandidate(candidateResponse.data.candidate);
-      
+
       if (biasResponse) {
         setBiasAnalysis(biasResponse.data.bias_analysis);
       }
@@ -103,7 +107,7 @@ const CandidateDetail = () => {
 
     try {
       const response = await apiService.chatWithCandidate(id, userMessage);
-      
+
       // Add AI response to chat
       const aiMessage = {
         type: 'ai',
@@ -115,7 +119,7 @@ const CandidateDetail = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
-      
+
       // Add error message
       const errorMessage = {
         type: 'ai',
@@ -163,8 +167,10 @@ const CandidateDetail = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
     { id: 'analysis', label: 'AI Analysis', icon: TrendingUp },
+    { id: 'analysis', label: 'AI Analysis', icon: TrendingUp },
     { id: 'bias', label: 'Bias Analysis', icon: Shield },
     { id: 'chat', label: 'AI Chat', icon: MessageSquare },
+    { id: 'interview', label: 'Interview Guide', icon: HelpCircle },
   ];
 
   if (loading) {
@@ -223,13 +229,13 @@ const CandidateDetail = () => {
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-3">
           <span className={`badge ${getCategoryColor(candidate.analysis?.category)}`}>
             {getCategoryIcon(candidate.analysis?.category)}
             <span className="ml-2">{candidate.analysis?.category || 'Pending'}</span>
           </span>
-          
+
           <div className="flex items-center space-x-2 text-sm">
             <Star className="h-4 w-4 text-yellow-500" />
             <span className="font-medium">{candidate.analysis?.overall_score || 0}%</span>
@@ -251,11 +257,10 @@ const CandidateDetail = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-                  activeTab === tab.id
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${activeTab === tab.id
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 <span>{tab.label}</span>
@@ -420,21 +425,21 @@ const CandidateDetail = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                       <div className={`p-4 rounded-lg ${getBiasRiskColor(biasAnalysis.overall_bias_score)}`}>
                         <p className="text-sm font-medium">Overall Bias Risk</p>
                         <p className="text-2xl font-bold">{Math.round(biasAnalysis.overall_bias_score)}%</p>
                         <p className="text-xs">{biasAnalysis.risk_level.toUpperCase()} RISK</p>
                       </div>
-                      
+
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <p className="text-sm font-medium text-gray-600">Categories Analyzed</p>
                         <p className="text-2xl font-bold text-gray-900">
                           {Object.keys(biasAnalysis.bias_categories || {}).length}
                         </p>
                       </div>
-                      
+
                       <div className="p-4 bg-gray-50 rounded-lg">
                         <p className="text-sm font-medium text-gray-600">Indicators Found</p>
                         <p className="text-2xl font-bold text-gray-900">
@@ -450,11 +455,10 @@ const CandidateDetail = () => {
                         <div key={category} className="border border-gray-200 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
                             <h5 className="font-medium text-gray-900 capitalize">{category} Bias</h5>
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              data.score >= 70 ? 'bg-danger-100 text-danger-800' :
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${data.score >= 70 ? 'bg-danger-100 text-danger-800' :
                               data.score >= 40 ? 'bg-warning-100 text-warning-800' :
-                              'bg-success-100 text-success-800'
-                            }`}>
+                                'bg-success-100 text-success-800'
+                              }`}>
                               {data.score}% Risk
                             </span>
                           </div>
@@ -505,21 +509,21 @@ const CandidateDetail = () => {
                 <Bot className="h-5 w-5 text-primary-500 mr-2" />
                 AI Chat about {candidate.analysis?.contact_info?.name || 'this candidate'}
               </h3>
-              
+
               {/* Chat Messages */}
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 h-96 overflow-y-auto mb-4 space-y-4">
                 {chatMessages.length === 0 ? (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center text-gray-500 mt-8"
                   >
                     <motion.div
-                      animate={{ 
+                      animate={{
                         scale: [1, 1.1, 1],
                         rotate: [0, 5, -5, 0]
                       }}
-                      transition={{ 
+                      transition={{
                         duration: 2,
                         repeat: Infinity,
                         repeatType: "reverse"
@@ -529,7 +533,7 @@ const CandidateDetail = () => {
                     </motion.div>
                     <p className="text-lg font-medium text-gray-700">Start a conversation about this candidate</p>
                     <p className="text-sm mt-2 text-gray-500">Ask about their skills, experience, or fit for specific roles</p>
-                    
+
                     {/* Quick suggestion buttons */}
                     <div className="mt-6 space-y-2">
                       {[
@@ -564,11 +568,10 @@ const CandidateDetail = () => {
                         className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-xs lg:max-w-2xl px-4 py-3 rounded-xl shadow-sm ${
-                            msg.type === 'user'
-                              ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white'
-                              : 'bg-white text-gray-900 border border-gray-200 hover:shadow-md transition-shadow duration-200'
-                          }`}
+                          className={`max-w-xs lg:max-w-2xl px-4 py-3 rounded-xl shadow-sm ${msg.type === 'user'
+                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white'
+                            : 'bg-white text-gray-900 border border-gray-200 hover:shadow-md transition-shadow duration-200'
+                            }`}
                         >
                           {msg.type === 'ai' && (
                             <div className="flex items-center space-x-2 mb-2">
@@ -581,17 +584,16 @@ const CandidateDetail = () => {
                               <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded-full">AI Assistant</span>
                             </div>
                           )}
-                          
-                          <div 
+
+                          <div
                             className="text-sm prose prose-sm max-w-none"
-                            dangerouslySetInnerHTML={{ 
-                              __html: msg.type === 'ai' ? formatAIResponse(msg.message) : msg.message 
+                            dangerouslySetInnerHTML={{
+                              __html: msg.type === 'ai' ? formatAIResponse(msg.message) : msg.message
                             }}
                           />
-                          
-                          <p className={`text-xs mt-2 ${
-                            msg.type === 'user' ? 'text-primary-100' : 'text-gray-500'
-                          }`}>
+
+                          <p className={`text-xs mt-2 ${msg.type === 'user' ? 'text-primary-100' : 'text-gray-500'
+                            }`}>
                             {new Date(msg.timestamp).toLocaleTimeString()}
                           </p>
                         </div>
@@ -599,7 +601,7 @@ const CandidateDetail = () => {
                     ))}
                   </AnimatePresence>
                 )}
-                
+
                 {isChatLoading && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -618,7 +620,7 @@ const CandidateDetail = () => {
                         <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded-full">AI Assistant</span>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <motion.div 
+                        <motion.div
                           className="flex space-x-1"
                           animate={{ opacity: [0.4, 1, 0.4] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
@@ -656,10 +658,150 @@ const CandidateDetail = () => {
               </div>
             </div>
           )}
+
+          {activeTab === 'interview' && (
+            <InterviewQuestionsTab
+              candidateId={id}
+              interviewQuestions={interviewQuestions}
+              setInterviewQuestions={setInterviewQuestions}
+            />
+          )}
         </motion.div>
       </AnimatePresence>
     </div>
   );
 };
+
+// Sub-component for Interview Questions to keep main component clean
+const InterviewQuestionsTab = ({ candidateId, interviewQuestions, setInterviewQuestions }) => {
+  const [loading, setLoading] = useState(!interviewQuestions);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!interviewQuestions) {
+      loadQuestions();
+    }
+  }, []);
+
+  const loadQuestions = async () => {
+    setLoading(true);
+    try {
+      const response = await apiService.getInterviewQuestions(candidateId);
+      setInterviewQuestions(response.data);
+    } catch (err) {
+      console.error('Error loading interview questions:', err);
+      setError('Failed to load interview questions. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="card p-12 text-center space-y-4">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          className="mx-auto w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full"
+        />
+        <p className="text-gray-600">Generating tailored interview questions...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card p-8 text-center">
+        <AlertTriangle className="h-12 w-12 text-danger-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Questions</h3>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button onClick={loadQuestions} className="btn-primary">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start space-x-3">
+        <HelpCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+        <div>
+          <h4 className="font-semibold text-blue-900">AI-Generated Interview Guide</h4>
+          <p className="text-sm text-blue-700">
+            These questions are tailored specifically to this candidate's profile, focusing on validating their strengths and probing their weaknesses.
+          </p>
+        </div>
+      </div>
+
+      {interviewQuestions?.technical_questions?.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <FileText className="h-5 w-5 text-gray-500 mr-2" />
+              Technical Verification
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {interviewQuestions.technical_questions.map((q, i) => (
+              <div key={i} className="p-6 hover:bg-gray-50 transition-colors">
+                <p className="font-medium text-gray-900 mb-2">Q{i + 1}: {q.question}</p>
+                <div className="flex items-start space-x-2 text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                  <span className="font-semibold text-gray-500 uppercase text-xs tracking-wider mt-0.5">Expected:</span>
+                  <span>{q.expected_answer_points}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {interviewQuestions?.behavioral_questions?.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <User className="h-5 w-5 text-gray-500 mr-2" />
+              Behavioral & Cultural Fit
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {interviewQuestions.behavioral_questions.map((q, i) => (
+              <div key={i} className="p-6 hover:bg-gray-50 transition-colors">
+                <p className="font-medium text-gray-900 mb-2">Q{i + 1}: {q.question}</p>
+                <div className="flex items-start space-x-2 text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                  <span className="font-semibold text-gray-500 uppercase text-xs tracking-wider mt-0.5">Looking For:</span>
+                  <span>{q.looking_for}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {interviewQuestions?.soft_skills_questions?.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+              <MessageSquare className="h-5 w-5 text-gray-500 mr-2" />
+              Soft Skills Assessment
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {interviewQuestions.soft_skills_questions.map((q, i) => (
+              <div key={i} className="p-6 hover:bg-gray-50 transition-colors">
+                <p className="font-medium text-gray-900 mb-2">Q{i + 1}: {q.question}</p>
+                <div className="flex items-start space-x-2 text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                  <span className="font-semibold text-gray-500 uppercase text-xs tracking-wider mt-0.5">Purpose:</span>
+                  <span>{q.purpose}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 export default CandidateDetail;

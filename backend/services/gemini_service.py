@@ -22,20 +22,41 @@ class GeminiService:
             self.configured = True
 
     def _call_gemini(self, messages, temperature=0.7, max_tokens=1500):
-        """Call Google Gemini API"""
+        """Call Google Gemini API with proper structure"""
         if not self.configured:
             return self._get_mock_response()
 
         try:
-            # Convert messages to Gemini format
-            gemini_content = ""
+            # Separate system prompt and chat history
+            system_instruction = None
+            contents = []
+            
             for msg in messages:
                 if msg['role'] == 'system':
-                    gemini_content += f"System: {msg['content']}\n\n"
+                    if system_instruction is None:
+                        system_instruction = {"parts": [{"text": msg['content']}]}
+                    else:
+                        # Append to existing system instruction
+                        system_instruction["parts"][0]["text"] += "\n\n" + msg['content']
                 elif msg['role'] == 'user':
-                    gemini_content += f"User: {msg['content']}\n\n"
+                    contents.append({
+                        "role": "user",
+                        "parts": [{"text": msg['content']}]
+                    })
+                elif msg['role'] == 'model' or msg['role'] == 'assistant':
+                    contents.append({
+                        "role": "model",
+                        "parts": [{"text": msg['content']}]
+                    })
 
-            gemini_content = gemini_content.strip()
+            # If no contents (e.g. only system prompt), add a dummy user message or handle it
+            # But usually there is a user prompt.
+            if not contents:
+                # Fallback if only system prompt was provided (unlikely in this app)
+                 contents.append({
+                        "role": "user",
+                        "parts": [{"text": "Please proceed."}]
+                    })
 
             url = f"{self.endpoint}?key={self.api_key}"
 
@@ -44,23 +65,21 @@ class GeminiService:
             }
 
             data = {
-                "contents": [
-                    {
-                        "parts": [
-                            {
-                                "text": gemini_content
-                            }
-                        ]
-                    }
-                ],
+                "contents": contents,
                 "generationConfig": {
                     "temperature": temperature,
                     "maxOutputTokens": max_tokens
                 }
             }
+            
+            if system_instruction:
+                data["systemInstruction"] = system_instruction
 
             response = requests.post(url, headers=headers, json=data, timeout=30)
-            response.raise_for_status()
+            
+            if response.status_code != 200:
+                print(f"❌ Gemini API Error {response.status_code}: {response.text}")
+                response.raise_for_status()
 
             result = response.json()
 
@@ -78,6 +97,9 @@ class GeminiService:
         except Exception as e:
             print(f"❌ Gemini API error: {e}")
             return self._get_mock_response()
+
+    def _get_mock_response(self):
+        return "I'm sorry, I cannot process your request right now because the AI service is unavailable. Please check your API key configuration."
 
     
 
@@ -455,6 +477,97 @@ RESPONSE FORMATTING RULES:
             import traceback
             print(f"❌ Traceback: {traceback.format_exc()}")
             return self._generate_mock_hr_response(candidates, message)
+
+    def generate_interview_questions(self, candidate, job_description=""):
+        """Generate tailored interview questions based on candidate profile"""
+        try:
+            analysis = candidate.get('analysis', {})
+            
+            prompt = f"""
+            Generate a set of interview questions for this candidate.
+            
+            Candidate Summary:
+            - Skills: {', '.join(analysis.get('key_skills', []))}
+            - Experience: {analysis.get('experience_years', 0)} years
+            - Strengths: {', '.join(analysis.get('strengths', []))}
+            - Weaknesses: {', '.join(analysis.get('weaknesses', []))}
+            
+            Job Description:
+            {job_description}
+            
+            Return a JSON object with this structure:
+            {{
+                "technical_questions": [
+                    {{ "question": "...", "expected_answer_points": "..." }}
+                ],
+                "behavioral_questions": [
+                    {{ "question": "...", "looking_for": "..." }}
+                ],
+                "soft_skills_questions": [
+                    {{ "question": "...", "purpose": "..." }}
+                ]
+            }}
+            """
+            
+            messages = [
+                {"role": "system", "content": "You are a senior technical recruiter creating interview guides. Provide challenging and relevant questions."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            response = self._call_gemini(messages)
+            
+            # Clean response to ensure it's valid JSON
+            response = response.replace("```json", "").replace("```", "").strip()
+            
+            return json.loads(response)
+            
+        except Exception as e:
+            print(f"❌ Error generating interview questions: {e}")
+            return {
+                "technical_questions": [{"question": "Can you describe your experience?", "expected_answer_points": "General overview"}],
+                "behavioral_questions": [],
+                "soft_skills_questions": []
+            }
+
+    def compare_candidates(self, candidates, job_description=""):
+        """Compare multiple candidates against a job description"""
+        try:
+            candidates_data = []
+            for c in candidates:
+                analysis = c.get('analysis', {})
+                candidates_data.append({
+                    "name": analysis.get('contact_info', {}).get('name', 'Unknown'),
+                    "score": analysis.get('overall_score', 0),
+                    "skills": analysis.get('key_skills', []),
+                    "experience": analysis.get('experience_years', 0)
+                })
+                
+            prompt = f"""
+            Compare the following candidates for the position described.
+            
+            Job Description:
+            {job_description}
+            
+            Candidates:
+            {json.dumps(candidates_data, indent=2)}
+            
+            Provide a detailed comparison in markdown format:
+            1. Ranking of candidates
+            2. Key differentiators
+            3. Pros and Cons for the top 3
+            4. Final recommendation
+            """
+            
+            messages = [
+                {"role": "system", "content": "You are a hiring manager making a final decision. specific and decisive."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            return self._call_gemini(messages)
+            
+        except Exception as e:
+            print(f"❌ Error comparing candidates: {e}")
+            return "Unable to compare candidates at this time."
 
     def _generate_mock_hr_response(self, candidates, message):
         """Generate mock response for HR chat when API fails"""

@@ -80,6 +80,13 @@ export const apiService = {
   
   sendNotification: (data) => 
     api.post('/collaboration/notify', data),
+
+  // Advanced AI Features
+  getInterviewQuestions: (candidateId) => 
+    api.get(`/interview-questions/${candidateId}`),
+
+  compareCandidates: (candidateIds, jobDescription) => 
+    api.post('/compare-candidates', { candidate_ids: candidateIds, job_description: jobDescription }),
 };
 
 export default api;
